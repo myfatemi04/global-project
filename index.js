@@ -85,9 +85,7 @@ app.get("/api/company_info", (req, res) => {
 app.get("/company_info", (req, res) => {
   const companies = getMatchingCompanies(req.query.company);
   if (companies.length === 0) {
-    res.status(404);
     res.render("not_found");
-    res.end();
     return;
   }
   const company = companies[0];
