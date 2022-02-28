@@ -1,15 +1,55 @@
 // main file
 
-const companies = [
-  {
-    name: "nestle",
-    rating: 0,
-  },
-  {
-    name: "amazon",
-    rating: -10,
-  },
-];
+const fs = require("fs");
+const CsvReadableStream = require("csv-reader");
+
+async function parseCSV() {
+  const inputStream = fs.createReadStream("Fortune_1000.csv", "utf8");
+
+  return new Promise((resolve, reject) => {
+    const rows = [];
+    inputStream
+      .pipe(
+        new CsvReadableStream({
+          parseNumbers: true,
+          parseBooleans: true,
+          trim: true,
+        })
+      )
+      .on("data", (row) => rows.push(row))
+      .on("end", () => resolve(rows));
+  });
+}
+
+function transformCSV(raw_rows) {
+  const headers = raw_rows[0];
+  const tfm_rows = [];
+  for (const row of raw_rows) {
+    const obj = {};
+    for (let i = 0; i < row.length; i++) {
+      obj[headers[i]] = row[i];
+    }
+    tfm_rows.push(obj);
+  }
+  return tfm_rows;
+}
+
+let companies = [];
+
+parseCSV().then((data) => {
+  companies = transformCSV(data);
+});
+
+// const companies = [
+//   {
+//     name: "nestle",
+//     rating: 0,
+//   },
+//   {
+//     name: "amazon",
+//     rating: -10,
+//   },
+// ];
 
 const express = require("express");
 
@@ -20,7 +60,7 @@ app.set("view engine", "hbs");
 function getMatchingCompanies(name) {
   const results = [];
   for (const company of companies) {
-    if (company.name.toLowerCase().includes(name)) {
+    if (company.company.toLowerCase().includes(name)) {
       results.push(company);
     }
   }
@@ -51,7 +91,11 @@ app.get("/company_info", (req, res) => {
     return;
   }
   const company = companies[0];
-  res.render("company_info", { name: company.name, rating: company.rating });
+  res.render("company_info", {
+    name: company.company,
+    revenue: company.revenue,
+    profit: company.profit,
+  });
   return;
 });
 
