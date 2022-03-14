@@ -55,6 +55,8 @@ const express = require("express");
 
 const app = express();
 
+app.use(express.static('public'))
+
 app.set("view engine", "hbs");
 
 function getMatchingCompanies(name) {
@@ -83,7 +85,8 @@ app.get("/api/company_info", (req, res) => {
 });
 
 app.get("/company_info", (req, res) => {
-  const companies = getMatchingCompanies(req.query.company);
+  const comp = req.query.company.toLowerCase()
+  const companies = getMatchingCompanies(comp);
   if (companies.length === 0) {
     res.render("not_found");
     return;
@@ -95,6 +98,10 @@ app.get("/company_info", (req, res) => {
     profit: company.profit,
   });
   return;
+});
+
+app.get("/", (req, res) => {
+  res.render('search')
 });
 
 app.listen(80, () => console.log("Listening"));

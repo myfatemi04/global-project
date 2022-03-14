@@ -5,11 +5,22 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Company Info: {{name}}</title>
+	<link rel="stylesheet" href="/main.css">
 </head>
 <body>
-	<h1>{{name}}</h1>
+	<div style="display: flex; flex-direction: column; align-items: center">
+		<h1>Boogle</h1>
+		<form action="/company_info">
+			<label for="company">Company</label>
+			<input name="company" type="text" id="company">
+			<button type="submit">Search</button>
+		</form>
 
-	<p>Revenue: {{revenue}}</p>
-	<p>Profit: {{profit}}</p>
+		<h2>{{name}}</h2>
+
+		<p>Revenue: {{revenue}}</p>
+		<p>Profit: {{profit}}</p>
+
+	</div>
 </body>
 </html>
