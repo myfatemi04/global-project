@@ -1,1 +1,0 @@
-python-amazon-simple-product-api
