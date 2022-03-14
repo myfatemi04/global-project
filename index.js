@@ -41,16 +41,26 @@ parseCSV().then((data) => {
   console.log(companies)
 });
 
-// const companies = [
-//   {
-//     name: "nestle",
-//     rating: 0,
-//   },
-//   {
-//     name: "amazon",
-//     rating: -10,
-//   },
-// ];
+/*
+
+companies is a list like:
+[
+  ...,
+  {
+    Rank: 49,
+    Name: 'Walt Disney',
+    sector: 'Media',
+    Articles: '',
+    'Unethical Practices': '',
+    'Exploited Countries': '',
+    Alternatives: ''
+  },
+  ...
+]
+
+So list[48].Name == 'Walt Disney'
+
+*/
 
 const express = require("express");
 
@@ -63,7 +73,7 @@ app.set("view engine", "hbs");
 function getMatchingCompanies(name) {
   const results = [];
   for (const company of companies) {
-    if (company.company.toLowerCase().includes(name)) {
+    if (company.Name.toLowerCase().includes(name)) {
       results.push(company);
     }
   }
@@ -94,9 +104,11 @@ app.get("/company_info", (req, res) => {
   }
   const company = companies[0];
   res.render("company_info", {
-    name: company.company,
-    revenue: company.revenue,
-    profit: company.profit,
+    name: company.Name,
+    revenue: 0,
+    profit: 0
+    // revenue: company.revenue,
+    // profit: company.profit,
   });
   return;
 });
