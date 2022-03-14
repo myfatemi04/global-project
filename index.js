@@ -4,7 +4,7 @@ const fs = require("fs");
 const CsvReadableStream = require("csv-reader");
 
 async function parseCSV() {
-  const inputStream = fs.createReadStream("Fortune_1000.csv", "utf8");
+  const inputStream = fs.createReadStream("f500.csv", "utf8");
 
   return new Promise((resolve, reject) => {
     const rows = [];
@@ -17,7 +17,7 @@ async function parseCSV() {
         })
       )
       .on("data", (row) => rows.push(row))
-      .on("end", () => resolve(rows));
+      .on("end", () => {resolve(rows)});
   });
 }
 
@@ -38,6 +38,7 @@ let companies = [];
 
 parseCSV().then((data) => {
   companies = transformCSV(data);
+  console.log(companies)
 });
 
 // const companies = [
