@@ -17,7 +17,9 @@ async function parseCSV() {
         })
       )
       .on("data", (row) => rows.push(row))
-      .on("end", () => {resolve(rows)});
+      .on("end", () => {
+        resolve(rows);
+      });
   });
 }
 
@@ -38,7 +40,7 @@ let companies = [];
 
 parseCSV().then((data) => {
   companies = transformCSV(data);
-  console.log(companies)
+  console.log(companies);
 });
 
 /*
@@ -66,7 +68,7 @@ const express = require("express");
 
 const app = express();
 
-app.use(express.static('public'))
+app.use(express.static("public"));
 
 app.set("view engine", "hbs");
 
@@ -96,7 +98,7 @@ app.get("/api/company_info", (req, res) => {
 });
 
 app.get("/company_info", (req, res) => {
-  const comp = req.query.company.toLowerCase()
+  const comp = req.query.company.toLowerCase();
   const companies = getMatchingCompanies(comp);
   if (companies.length === 0) {
     res.render("not_found");
@@ -106,7 +108,7 @@ app.get("/company_info", (req, res) => {
   res.render("company_info", {
     name: company.Name,
     revenue: 0,
-    profit: 0
+    profit: 0,
     // revenue: company.revenue,
     // profit: company.profit,
   });
@@ -114,7 +116,7 @@ app.get("/company_info", (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.render('search')
+  res.render("search");
 });
 
-app.listen(80, () => console.log("Listening"));
+app.listen(process.env.PORT || 80, () => console.log("Listening"));
