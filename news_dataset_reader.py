@@ -1,7 +1,8 @@
 import json
 import os
-from functools import lru_cache
+import random
 import time
+from functools import lru_cache
 
 import bs4
 import requests
@@ -42,7 +43,7 @@ def get_sentiment(text):
     subjectivity = sentiment.subjectivity
     polarity = sentiment.polarity
 
-    return subjectivity, polarity
+    return polarity, subjectivity
 
 
 @lru_cache(maxsize=None)
@@ -69,9 +70,8 @@ def get_stories(company_name: str):
         ]:
             continue
 
-        if company_name in story['headline']:
-            subjectivity, polarity = get_sentiment(story['short_description'])
-            results.append((polarity, subjectivity, story))
+        if company_name in story['headline'] or company_name in story['short_description']:
+            results.append(story)
 
     return results
 
@@ -118,56 +118,117 @@ def get_huffpost_article_body(url):
 def download_and_cache_stories(stories):
     errors = []
 
-    previous_line_length = 0
-    for i, (polarity, subjectivity, story) in enumerate(stories):
-        link = story['link']
-        line = f'{i + 1} / {len(stories)} Downloading article body for {link}'
-        print(line + ' ' * max(0, previous_line_length - len(line)))
-        previous_line_length = len(line)
+    def thread_loop():
+        nonlocal total_stories_processed
 
-        try:
-            get_huffpost_article_body(link)
-        except Exception as e:
-            print("Error:", e)
-            errors.append((story, e))
+        while stories_queue:
+            story = stories_queue.popleft()
+            try:
+                print(
+                    f"Processing {total_stories_processed + 1}/{len(stories)}")
+                get_huffpost_article_body(story['link'])
+                total_stories_processed += 1
+            except Exception as e:
+                print("Error:", e)
+                errors.append((story, e))
+                total_stories_processed += 1
 
-    print()
+    import threading
+    from collections import deque
+
+    n_threads = 25
+    threads = [threading.Thread(target=thread_loop) for _ in range(n_threads)]
+    total_stories_processed = 0
+
+    stories_queue = deque(stories)
+
+    for thread in threads:
+        thread.start()
+
+    for thread in threads:
+        thread.join()
+
+    # previous_line_length = 0
+    # for i, story in enumerate(stories):
+    #     link = story['link']
+    #     line = f'{i + 1} / {len(stories)} retrieving: {link}'
+    #     print(line + ' ' * max(0, previous_line_length - len(line)), end='\r')
+    #     previous_line_length = len(line)
+
+    #     try:
+    #         get_huffpost_article_body(link)
+    #     except Exception as e:
+    #         print("Error:", e)
+    #         errors.append((story, e))
+
+    # print()
 
     return errors
 
 
+def get_story_content_guarded(story):
+    try:
+        return get_huffpost_article_body(story)
+    except Exception as e:
+        return story['short_description']
+
+
+def plot_polarity_and_sentiment(stories_with_sentiment):
+    polarities = []
+    subjectivities = []
+
+    for (p, s), _, _ in stories_with_sentiment:
+        polarities.append(p)
+        subjectivities.append(s)
+
+    import matplotlib.pyplot as plt
+
+    plt.scatter(polarities, subjectivities)
+    plt.xlabel("Polarity")
+    plt.ylabel("Subjectivity")
+    plt.xlim(-1, 1)
+    plt.ylim(-1, 1)
+    plt.show()
+
+
 def main():
-    company_name = 'Facebook'
+    company_name = 'Amazon'
 
-    relevant_stories_with_sentiment = get_stories(company_name)
-    relevant_stories_with_sentiment = sorted(
-        relevant_stories_with_sentiment, key=lambda x: x[0])
+    company_stories = get_stories(company_name)
 
-    print("Number of", company_name, "stories:",
-          len(relevant_stories_with_sentiment))
+    print("Number of", company_name, "stories:", len(company_stories))
 
-    get_huffpost_article_body(
-        'https://www.huffingtonpost.com/entry/facebook-advertising-racism_us_58136a76e4b0390e69cfa6bf')
+    # _errors = download_and_cache_stories(company_stories)
 
-    errors = download_and_cache_stories(relevant_stories_with_sentiment)
+    matching_stories = []
 
-    print(errors)
+    keyword = 'political'
 
-    # print("3 most negative stories:")
-    # for polarity, subjectivity, story in relevant_stories_with_sentiment[:3]:
-    #     print("Polarity:", polarity, "Subjectivity:", subjectivity)
-    #     print_story(story)
+    print(keyword, "stories")
+    for story in company_stories:
+        if keyword in get_story_content_guarded(story).lower().split():
+            matching_stories.append(story)
 
-    # print('3 most positive stories:')
-    # for polarity, subjectivity, story in relevant_stories_with_sentiment[-3:]:
-    #     print("Polarity:", polarity, "Subjectivity:", subjectivity)
-    #     print_story(story)
+    for story in matching_stories[:3]:
+        print_story(story)
 
-    # if False:
-    #     content = get_huffpost_article_body(
-    #         'https://www.huffingtonpost.com/entry/amazon-strike-christmas_us_5bb2ff3fe4b0480ca660d538')
+    print("Found {} matching stories".format(len(matching_stories)))
+    exit()
 
-    #     print(content)
+    stories_with_sentiment = list(map(lambda story: (get_sentiment(
+        get_story_content_guarded(story)), random.random(), story), company_stories))
+
+    stories_sorted_by_sentiment = list(sorted(stories_with_sentiment))
+
+    print("3 most negative stories:")
+    for (polarity, subjectivity), _, story in stories_sorted_by_sentiment[:3]:
+        print("Polarity:", polarity, "Subjectivity:", subjectivity)
+        print_story(story)
+
+    print('3 most positive stories:')
+    for (polarity, subjectivity), _, story in stories_sorted_by_sentiment[-3:]:
+        print("Polarity:", polarity, "Subjectivity:", subjectivity)
+        print_story(story)
 
 
 if __name__ == "__main__":
