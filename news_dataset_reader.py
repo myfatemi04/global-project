@@ -8,6 +8,9 @@ import bs4
 import requests
 import textblob
 
+# Corporate Problem API source
+# https://violationtracker.goodjobsfirst.org/prog.php?parent=amazoncom&detail=csv_results
+
 # News dataset source:
 # https://www.kaggle.com/datasets/rmisra/news-category-dataset
 with open("./News_Category_Dataset_v2.json", "r") as f:
