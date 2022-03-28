@@ -1,9 +1,11 @@
+import json
+import os
+from functools import lru_cache
+import time
+
 import bs4
 import requests
-from functools import lru_cache
-import json
 import textblob
-
 
 # News dataset source:
 # https://www.kaggle.com/datasets/rmisra/news-category-dataset
@@ -23,8 +25,6 @@ example_story = {
 categories = set()
 for story in stories:
     categories.add(story['category'])
-
-print(list(categories))
 
 
 def print_story(story):
@@ -46,10 +46,10 @@ def get_sentiment(text):
 
 
 @lru_cache(maxsize=None)
-def get_stories(company_name: str, verbose: bool = False):
-    company_name = 'Amazon'
+def get_stories(company_name: str):
+    # Setting the company_name to be empty will return all stories
 
-    relevant_stories_with_sentiment = []
+    results = []
     for story in stories:
         if story['category'] in [
             'ENTERTAINMENT',
@@ -71,32 +71,9 @@ def get_stories(company_name: str, verbose: bool = False):
 
         if company_name in story['headline']:
             subjectivity, polarity = get_sentiment(story['short_description'])
-            relevant_stories_with_sentiment.append(
-                (polarity, subjectivity, story))
+            results.append((polarity, subjectivity, story))
 
-    relevant_stories_with_sentiment = list(
-        sorted(relevant_stories_with_sentiment, key=lambda x: x[0]))
-
-    return relevant_stories_with_sentiment
-
-
-if __name__ == "__main__":
-    company_name = 'Amazon'
-
-    relevant_stories_with_sentiment = get_stories(company_name)
-
-    print("Number of", company_name, "stories:",
-          len(relevant_stories_with_sentiment))
-
-    print("3 most negative stories:")
-    for polarity, subjectivity, story in relevant_stories_with_sentiment[:3]:
-        print("Polarity:", polarity, "Subjectivity:", subjectivity)
-        print_story(story)
-
-    print('3 most positive stories:')
-    for polarity, subjectivity, story in relevant_stories_with_sentiment[-3:]:
-        print("Polarity:", polarity, "Subjectivity:", subjectivity)
-        print_story(story)
+    return results
 
 
 def make_huffpost_request(url):
@@ -105,18 +82,93 @@ def make_huffpost_request(url):
     return soup
 
 
-def get_huffpost_article_content(url):
+def get_huffpost_article_body(url):
+    # All URLs in this dataset follow the format: 'https://www.huffingtonpost.com/entry/amazon-strike-christmas_us_5bb2ff3fe4b0480ca660d538'
+    article_id = url.split('/')[-1]
+
+    filename = f'./article_cache/{article_id}_body.txt'
+
+    if not os.path.exists('./article_cache'):
+        os.mkdir('./article_cache')
+    elif os.path.isfile('./article_cache'):
+        raise Exception("article_cache is not a directory")
+
+    if os.path.exists(filename):
+        with open(filename, 'r') as f:
+            body = f.read()
+
+        return body
+
     soup = make_huffpost_request(url)
 
     entry_body = soup.find(id='entry-body')
+    if entry_body is None:
+        raise Exception("No entry body found")
+
     paragraphs = entry_body.select('.primary-cli.cli-text > p')
 
-    article_text = '\n\n'.join([p.text for p in paragraphs])
+    body = '\n\n'.join([p.text for p in paragraphs])
 
-    return article_text
+    with open(filename, 'w') as f:
+        f.write(body)
+
+    return body
 
 
-content = get_huffpost_article_content(
-    'https://www.huffingtonpost.com/entry/amazon-strike-christmas_us_5bb2ff3fe4b0480ca660d538')
+def download_and_cache_stories(stories):
+    errors = []
 
-print(content)
+    previous_line_length = 0
+    for i, (polarity, subjectivity, story) in enumerate(stories):
+        link = story['link']
+        line = f'{i + 1} / {len(stories)} Downloading article body for {link}'
+        print(line + ' ' * max(0, previous_line_length - len(line)))
+        previous_line_length = len(line)
+
+        try:
+            get_huffpost_article_body(link)
+        except Exception as e:
+            print("Error:", e)
+            errors.append((story, e))
+
+    print()
+
+    return errors
+
+
+def main():
+    company_name = 'Facebook'
+
+    relevant_stories_with_sentiment = get_stories(company_name)
+    relevant_stories_with_sentiment = sorted(
+        relevant_stories_with_sentiment, key=lambda x: x[0])
+
+    print("Number of", company_name, "stories:",
+          len(relevant_stories_with_sentiment))
+
+    get_huffpost_article_body(
+        'https://www.huffingtonpost.com/entry/facebook-advertising-racism_us_58136a76e4b0390e69cfa6bf')
+
+    errors = download_and_cache_stories(relevant_stories_with_sentiment)
+
+    print(errors)
+
+    # print("3 most negative stories:")
+    # for polarity, subjectivity, story in relevant_stories_with_sentiment[:3]:
+    #     print("Polarity:", polarity, "Subjectivity:", subjectivity)
+    #     print_story(story)
+
+    # print('3 most positive stories:')
+    # for polarity, subjectivity, story in relevant_stories_with_sentiment[-3:]:
+    #     print("Polarity:", polarity, "Subjectivity:", subjectivity)
+    #     print_story(story)
+
+    # if False:
+    #     content = get_huffpost_article_body(
+    #         'https://www.huffingtonpost.com/entry/amazon-strike-christmas_us_5bb2ff3fe4b0480ca660d538')
+
+    #     print(content)
+
+
+if __name__ == "__main__":
+    main()
