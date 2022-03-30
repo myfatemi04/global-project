@@ -1,3 +1,4 @@
+import json
 import threading
 from collections import deque
 import bs4
@@ -18,6 +19,12 @@ for option in soup.find_all('option'):
         pairings.append((short_name, long_name))
 
 print(len(pairings))
+
+index = [{"long_name": long_name, "short_name": short_name}
+         for short_name, long_name in pairings]
+
+
+json.dump(index, open("./index.json", "w"))
 
 
 queue = deque(pairings)

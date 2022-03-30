@@ -3,8 +3,8 @@
 const fs = require("fs");
 const CsvReadableStream = require("csv-reader");
 
-async function parseCSV() {
-  const inputStream = fs.createReadStream("f500.csv", "utf8");
+async function parseCSV(filename = "f500.csv") {
+  const inputStream = fs.createReadStream(filename, "utf8");
 
   return new Promise((resolve, reject) => {
     const rows = [];
@@ -23,24 +23,24 @@ async function parseCSV() {
   });
 }
 
-function transformCSV(raw_rows) {
-  const headers = raw_rows[0];
-  const tfm_rows = [];
-  for (const row of raw_rows) {
-    const obj = {};
-    for (let i = 0; i < row.length; i++) {
-      obj[headers[i]] = row[i];
+function transformCSV(rows) {
+  const columnTitles = rows[0];
+  const transformedRows = [];
+  for (let rowNumber = 1; rowNumber < rows.length; rowNumber++) {
+    const row = rows[rowNumber];
+    const object = {};
+    for (let columnNumber = 0; columnNumber < row.length; columnNumber++) {
+      object[columnTitles[columnNumber]] = row[columnNumber];
     }
-    tfm_rows.push(obj);
+    transformedRows.push(object);
   }
-  return tfm_rows;
+  return transformedRows;
 }
 
 let companies = [];
 
 parseCSV().then((data) => {
   companies = transformCSV(data);
-  console.log(companies);
 });
 
 /*
@@ -63,6 +63,39 @@ companies is a list like:
 So list[48].Name == 'Walt Disney'
 
 */
+
+/**
+ * Dictionary with the key being the short name, and the value being the violations.
+ */
+
+async function loadAllCompanies() {
+  const violationsByCompany = {};
+  const index = JSON.parse(
+    fs.readFileSync("./corporation_search_api/index.json", "utf8")
+  );
+  await Promise.all(
+    index.map(
+      (company) =>
+        new Promise((resolve, reject) => {
+          loadCompanyInformation(
+            `./corporation_search_api/data/${company.short_name}.csv`
+          )
+            .then((violations) => {
+              violationsByCompany[company.short_name] = violations;
+              resolve();
+            })
+            .catch(reject);
+        })
+    )
+  );
+  return violationsByCompany;
+}
+
+async function loadCompanyInformation(file) {
+  return transformCSV(await parseCSV(file));
+}
+
+loadAllCompanies();
 
 const express = require("express");
 
