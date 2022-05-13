@@ -1,10 +1,15 @@
 // main file
 
-const fs = require("fs");
-const CsvReadableStream = require("csv-reader");
+import CsvReadableStream from "csv-reader";
+import * as express from "express";
+import { createReadStream, readFileSync } from "fs";
+import fetch from "node-fetch";
+import * as c from "csv-string";
 
 async function parseCSV(filename = "f500.csv") {
-  const inputStream = fs.createReadStream(filename, "utf8");
+  const inputStream = createReadStream(filename, "utf8");
+
+  // CSV: https://violationtracker.goodjobsfirst.org/prog.php?parent={short_name}&detail=csv_results
 
   return new Promise((resolve, reject) => {
     const rows = [];
@@ -19,6 +24,30 @@ async function parseCSV(filename = "f500.csv") {
       .on("data", (row) => rows.push(row))
       .on("end", () => {
         resolve(rows);
+      });
+  });
+}
+
+const csvCache = {};
+
+async function parseCSVNetwork(url) {
+  if (csvCache[url]) {
+    return csvCache[url];
+  }
+
+  return new Promise((resolve, reject) => {
+    fetch(url)
+      .then((response) => {
+        if (response.status != 200) {
+          csvCache[url] = null;
+          reject(new Error(`${response.status} ${response.statusText}`));
+        }
+        return response.text();
+      })
+      .then((text) => {
+        const csv = c.parse(text);
+        csvCache[url] = csv;
+        resolve(csv);
       });
   });
 }
@@ -70,26 +99,33 @@ So list[48].Name == 'Walt Disney'
 
 async function loadAllCompanies() {
   const violationsByCompany = {};
-  const index = JSON.parse(
-    fs.readFileSync("./corporation_search_api/index.json", "utf8")
+  const allCompanyNameMetadata = JSON.parse(
+    readFileSync("./corporation_search_api/index.json", "utf8")
   );
-  await Promise.all(
-    index.map(
-      (company) =>
-        new Promise((resolve, reject) => {
-          loadCompanyInformation(
-            `./corporation_search_api/data/${company.short_name}.csv`
-          )
-            .then((violations) => {
-              violationsByCompany[company.short_name] = violations;
-              resolve();
-            })
-            .catch(reject);
-        })
-    )
-  );
-  return violationsByCompany;
+  // await Promise.all(
+  //   allCompanyNameMetadata.map(
+  //     (companyNameMetadata) =>
+  //       new Promise((resolve, reject) => {
+  //         loadCompanyInformation(
+  //           `./corporation_search_api/data/${companyNameMetadata.short_name}.csv`
+  //         )
+  //           .then((violations) => {
+  //             violationsByCompany[companyNameMetadata.short_name] = violations;
+  //             resolve();
+  //           })
+  //           .catch(reject);
+  //       })
+  //   )
+  // );
+
+  companyInfo.violations = violationsByCompany;
+  companyInfo.companyNames = allCompanyNameMetadata;
 }
+
+const companyInfo = {
+  violations: null,
+  companyNames: null,
+};
 
 async function loadCompanyInformation(file) {
   return transformCSV(await parseCSV(file));
@@ -97,22 +133,16 @@ async function loadCompanyInformation(file) {
 
 loadAllCompanies();
 
-const express = require("express");
-
-const app = express();
+const app = express.default();
 
 app.use(express.static("public"));
 
 app.set("view engine", "hbs");
 
 function getMatchingCompanies(name) {
-  const results = [];
-  for (const company of companies) {
-    if (company.Name.toLowerCase().includes(name)) {
-      results.push(company);
-    }
-  }
-  return results;
+  return companies.filter((company) =>
+    company.Name.toLowerCase().startsWith(name.toLowerCase())
+  );
 }
 
 app.get("/api/company_info", (req, res) => {
@@ -130,22 +160,50 @@ app.get("/api/company_info", (req, res) => {
   return;
 });
 
-app.get("/company_info", (req, res) => {
-  const comp = req.query.company.toLowerCase();
-  const companies = getMatchingCompanies(comp);
-  if (companies.length === 0) {
+async function getViolationsCSVasJSON(companyShortName) {
+  const url = `https://violationtracker.goodjobsfirst.org/prog.php?parent=${companyShortName}&detail=csv_results`;
+
+  return await transformCSV(await parseCSVNetwork(url));
+}
+
+app.get("/company_info", async (req, res) => {
+  const parentCompany = req.query.company; // .toLowerCase();
+  let parentCompanyShortName = null;
+  for (let company of companyInfo.companyNames) {
+    if (company.long_name.trim() == parentCompany.trim()) {
+      parentCompanyShortName = company.short_name;
+    }
+  }
+
+  const parentCompanyViolations = await getViolationsCSVasJSON(
+    parentCompanyShortName
+  );
+
+  if (parentCompanyViolations == null) {
     res.render("not_found");
     return;
   }
-  const company = companies[0];
+
   res.render("company_info", {
-    name: company.Name,
-    revenue: 0,
-    profit: 0,
-    // revenue: company.revenue,
-    // profit: company.profit,
+    violationsJSON: JSON.stringify(parentCompanyViolations),
+    name: parentCompany,
+    shortName: parentCompanyShortName,
   });
-  return;
+
+  // const companies = getMatchingCompanies(comp);
+  // if (companies.length === 0) {
+  //   res.render("not_found");
+  //   return;
+  // }
+  // const company = companies[0];
+  // res.render("company_info", {
+  //   name: company.Name,
+  //   revenue: 0,
+  //   profit: 0,
+  //   // revenue: company.revenue,
+  //   // profit: company.profit,
+  // });
+  // return;
 });
 
 app.get("/", (req, res) => {

@@ -1,36 +1,160 @@
-<!DOCTYPE html>
 <html lang="en">
+
 <head>
-	<meta charset="UTF-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Company Info: {{name}}</title>
-	<link rel="stylesheet" href="/main.css">
-	<!-- Global site tag (gtag.js) - Google Analytics -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-F0024NGH8X"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-F0024NGH8X');
-</script>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Company Info: {{name}}</title>
+  <link rel="stylesheet" href="/main.css" />
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-F0024NGH8X"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "G-F0024NGH8X");
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 </head>
+
 <body>
-	<div style="display: flex; flex-direction: column; align-items: center">
-		<h1>Business Search</h1>
-		<form action="/company_info">
-			<label for="company">Company</label>
-			<input name="company" type="text" id="company">
-			<button type="submit">Search</button>
-		</form>
+  <div style="display: flex; flex-direction: column; align-items: center; max-width: 40rem; margin: 0 auto">
+    <h1>Business Search</h1>
+    <form action="/company_info">
+      <label for="company">Company</label>
+      <input name="company" type="text" id="company" />
+      <button type="submit">Search</button>
+    </form>
 
-		<h2>{{name}}</h2>
+    <h2>{{name}}</h2>
 
-		<p>Revenue: {{revenue}}</p>
-		<p>Profit: {{profit}}</p>
+    {{!-- https://violationtracker.goodjobsfirst.org/prog.php?parent=amazoncom --}}
+    <a href="http://violationtracker.goodjobsfirst.org/prog.php?parent={{shortName}}" target="_blank"
+      referrerpolicy="noreferrer nofollower">View Detailed History</a>
 
-		<img src="/flyer.png" alt="Flyer" style="max-width: 25rem; margin-top: 5rem">
-	</div>
+    <div id="penalties">
+    </div>
+
+    <h3>Violations By Year</h3>
+    <canvas id="violationsByYear" width="800" height="400"></canvas>
+
+    <h3>Violations By Type</h3>
+    <canvas id="violationsByType" width="400" height="400"></canvas>
+
+    <img src="/flyer.png" alt="Flyer" style="max-width: 25rem; margin-top: 5rem" />
+  </div>
+  <script>
+    const info = {{{ violationsJSON }}};
+  </script>
+
+  {{!-- Violations per year script --}}
+  <script>
+    const violationsPerYear = {};
+    const byYearCtx = document.getElementById("violationsByYear").getContext("2d");
+
+    for (const row of info) {
+      const year = row["Penalty Year"];
+      if (!violationsPerYear[year]) {
+        violationsPerYear[year] = 0;
+      }
+      violationsPerYear[year]++;
+    }
+
+    const uniqueYears = Object.keys(violationsPerYear);
+    uniqueYears.sort();
+
+    const myChart = new Chart(byYearCtx, {
+      type: "bar",
+      data: {
+        labels: uniqueYears,
+        datasets: [
+          {
+            label: "# of Violations",
+            data: uniqueYears.map((year) => violationsPerYear[year]),
+            backgroundColor: "rgba(50, 99, 250, 0.7)",
+            // backgroundColor: [
+            //   "rgba(255, 99, 132, 0.2)",
+            //   "rgba(54, 162, 235, 0.2)",
+            //   "rgba(255, 206, 86, 0.2)",
+            //   "rgba(75, 192, 192, 0.2)",
+            //   "rgba(153, 102, 255, 0.2)",
+            //   "rgba(255, 159, 64, 0.2)",
+            // ],
+            // borderColor: [
+            //   "rgba(255, 99, 132, 1)",
+            //   "rgba(54, 162, 235, 1)",
+            //   "rgba(255, 206, 86, 1)",
+            //   "rgba(75, 192, 192, 1)",
+            //   "rgba(153, 102, 255, 1)",
+            //   "rgba(255, 159, 64, 1)",
+            // ],
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: { scales: { y: { beginAtZero: true } } },
+    });
+  </script>
+
+  {{!-- Offense types --}}
+  <script>
+    const violationsByType = {};
+
+    for (const row of info) {
+      const type = row["Offense Group"];
+      if (!violationsByType[type]) {
+        violationsByType[type] = 0;
+      }
+      violationsByType[type]++;
+    }
+
+    const uniqueTypes = Object.keys(violationsByType);
+    uniqueTypes.sort((a, b) => violationsByType[a] - violationsByType[b]);
+    // Pie Chart
+    const byTypeCtx = document.getElementById("violationsByType").getContext("2d");
+    const pieChart = new Chart(byTypeCtx, {
+      type: "pie",
+      data: {
+        labels: uniqueTypes,
+        datasets: [
+          {
+            label: "# of Violations",
+            data: uniqueTypes.map((type) => violationsByType[type]),
+            backgroundColor: "rgba(50, 99, 250, 0.7)",
+          }
+        ]
+      }
+    });
+  </script>
+
+  {{!-- Penalties script --}}
+  <script>
+    let totalPenalty = 0;
+
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+
+      // These options are needed to round to whole numbers if that's what you want.
+      //minimumFractionDigits: 0, // (this suffices for whole numbers, but will print 2500.10 as $2,500.1)
+      //maximumFractionDigits: 0, // (causes 2500.99 to be printed as $2,501)
+    });
+
+    for (const row of info) {
+      totalPenalty += Number(row['Penalty Amount'].replace(/,/g, '').slice(1))
+    }
+
+    const totalPenaltyString = formatter.format(totalPenalty);
+
+    const resultString = `
+      <h3>Total Penalties: ${totalPenaltyString}</h3>
+      <h3>Total Violations: ${info.length}</h3>
+    `;
+
+    document.getElementById("penalties").innerHTML = resultString;
+  </script>
 </body>
+
 </html>

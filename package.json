@@ -9,11 +9,13 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "type": "module",
   "dependencies": {
     "csv-reader": "^1.0.8",
+    "csv-string": "^4.1.0",
     "express": "^4.17.3",
     "express-handlebars": "^6.0.2",
-    "hbs": "^4.2.0"
+    "hbs": "^4.2.0",
+    "node-fetch": "^3.2.4"
   }
 }
