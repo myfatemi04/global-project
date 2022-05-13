@@ -6,6 +6,8 @@ import { createReadStream, readFileSync } from "fs";
 import fetch from "node-fetch";
 import * as c from "csv-string";
 
+let agg = JSON.parse(readFileSync("./agg.json"));
+
 async function parseCSV(filename = "f500.csv") {
   const inputStream = createReadStream(filename, "utf8");
 
@@ -168,6 +170,10 @@ async function getViolationsCSVasJSON(companyShortName) {
 
 app.get("/company_info", async (req, res) => {
   const parentCompany = req.query.company; // .toLowerCase();
+  if (!parentCompany) {
+    res.render("not_found");
+    return;
+  }
   let parentCompanyShortName = null;
   for (let company of companyInfo.companyNames) {
     if (company.long_name.trim() == parentCompany.trim()) {
@@ -188,6 +194,7 @@ app.get("/company_info", async (req, res) => {
     violationsJSON: JSON.stringify(parentCompanyViolations),
     name: parentCompany,
     shortName: parentCompanyShortName,
+    agg: JSON.stringify(agg),
   });
 
   // const companies = getMatchingCompanies(comp);

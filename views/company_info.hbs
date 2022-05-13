@@ -46,7 +46,7 @@
     <img src="/flyer.png" alt="Flyer" style="max-width: 25rem; margin-top: 5rem" />
   </div>
   <script>
-    const info = {{{ violationsJSON }}};
+    const violations = {{{ violationsJSON }}};
   </script>
 
   {{!-- Violations per year script --}}
@@ -54,7 +54,7 @@
     const violationsPerYear = {};
     const byYearCtx = document.getElementById("violationsByYear").getContext("2d");
 
-    for (const row of info) {
+    for (const row of violations) {
       const year = row["Penalty Year"];
       if (!violationsPerYear[year]) {
         violationsPerYear[year] = 0;
@@ -102,7 +102,7 @@
   <script>
     const violationsByType = {};
 
-    for (const row of info) {
+    for (const row of violations) {
       const type = row["Offense Group"];
       if (!violationsByType[type]) {
         violationsByType[type] = 0;
@@ -131,6 +131,9 @@
 
   {{!-- Penalties script --}}
   <script>
+    // Used for rankings
+    const agg = {{{ agg }}};
+
     let totalPenalty = 0;
 
     const formatter = new Intl.NumberFormat('en-US', {
@@ -142,15 +145,32 @@
       //maximumFractionDigits: 0, // (causes 2500.99 to be printed as $2,501)
     });
 
-    for (const row of info) {
+    for (const row of violations) {
       totalPenalty += Number(row['Penalty Amount'].replace(/,/g, '').slice(1))
+    }
+
+    const P = agg.penalties;
+    const Counts = agg.violationCounts;
+
+    let penaltyAmountRank = 1;
+    for (penaltyAmountRank = 1; penaltyAmountRank <= P.length; penaltyAmountRank++) {
+      if (totalPenalty > P[P.length - penaltyAmountRank]) {
+        break;
+      }
+    }
+
+    let countRank = 1;
+    for (countRank = 1; countRank <= Counts.length; countRank++) {
+      if (violations.length > Counts[Counts.length - countRank]) {
+        break;
+      }
     }
 
     const totalPenaltyString = formatter.format(totalPenalty);
 
     const resultString = `
-      <h3>Total Penalties: ${totalPenaltyString}</h3>
-      <h3>Total Violations: ${info.length}</h3>
+      <h3>Total Penalties: ${totalPenaltyString} (Top ${penaltyAmountRank})</h3>
+      <h3>Total Violations: ${violations.length} (Top ${countRank})</h3>
     `;
 
     document.getElementById("penalties").innerHTML = resultString;
