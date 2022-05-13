@@ -70,26 +70,33 @@ So list[48].Name == 'Walt Disney'
 
 async function loadAllCompanies() {
   const violationsByCompany = {};
-  const index = JSON.parse(
+  const allCompanyNameMetadata = JSON.parse(
     fs.readFileSync("./corporation_search_api/index.json", "utf8")
   );
   await Promise.all(
-    index.map(
-      (company) =>
+    allCompanyNameMetadata.map(
+      (companyNameMetadata) =>
         new Promise((resolve, reject) => {
           loadCompanyInformation(
-            `./corporation_search_api/data/${company.short_name}.csv`
+            `./corporation_search_api/data/${companyNameMetadata.short_name}.csv`
           )
             .then((violations) => {
-              violationsByCompany[company.short_name] = violations;
+              violationsByCompany[companyNameMetadata.short_name] = violations;
               resolve();
             })
             .catch(reject);
         })
     )
   );
-  return violationsByCompany;
+
+  companyInfo.violations = violationsByCompany;
+  companyInfo.companyNames = allCompanyNameMetadata;
 }
+
+const companyInfo = {
+  violations: null,
+  companyNames: null,
+};
 
 async function loadCompanyInformation(file) {
   return transformCSV(await parseCSV(file));
@@ -106,13 +113,9 @@ app.use(express.static("public"));
 app.set("view engine", "hbs");
 
 function getMatchingCompanies(name) {
-  const results = [];
-  for (const company of companies) {
-    if (company.Name.toLowerCase().includes(name)) {
-      results.push(company);
-    }
-  }
-  return results;
+  return companies.filter((company) =>
+    company.Name.toLowerCase().startsWith(name.toLowerCase())
+  );
 }
 
 app.get("/api/company_info", (req, res) => {
@@ -131,21 +134,42 @@ app.get("/api/company_info", (req, res) => {
 });
 
 app.get("/company_info", (req, res) => {
-  const comp = req.query.company.toLowerCase();
-  const companies = getMatchingCompanies(comp);
-  if (companies.length === 0) {
+  const parentCompany = req.query.company; // .toLowerCase();
+  let parentCompanyShortName = null;
+  for (let company of companyInfo.companyNames) {
+    if (company.long_name == parentCompany) {
+      parentCompanyShortName = company.short_name;
+    }
+  }
+
+  const parentCompanyViolations =
+    companyInfo.violations[parentCompanyShortName];
+
+  if (parentCompanyViolations == null) {
     res.render("not_found");
     return;
   }
-  const company = companies[0];
+
   res.render("company_info", {
-    name: company.Name,
-    revenue: 0,
-    profit: 0,
-    // revenue: company.revenue,
-    // profit: company.profit,
+    violationsJSON: JSON.stringify(parentCompanyViolations),
+    name: parentCompany,
+    shortName: parentCompanyShortName,
   });
-  return;
+
+  // const companies = getMatchingCompanies(comp);
+  // if (companies.length === 0) {
+  //   res.render("not_found");
+  //   return;
+  // }
+  // const company = companies[0];
+  // res.render("company_info", {
+  //   name: company.Name,
+  //   revenue: 0,
+  //   profit: 0,
+  //   // revenue: company.revenue,
+  //   // profit: company.profit,
+  // });
+  // return;
 });
 
 app.get("/", (req, res) => {
