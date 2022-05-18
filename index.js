@@ -32,6 +32,17 @@ async function parseCSV(filename = "f500.csv") {
 
 const csvCache = {};
 
+async function debugURLRequest(url) {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36",
+    },
+  });
+  const data = await response.text();
+  return data;
+}
+
 async function parseCSVNetwork(url) {
   if (csvCache[url]) {
     return csvCache[url];
@@ -48,6 +59,7 @@ async function parseCSVNetwork(url) {
         if (response.status != 200) {
           csvCache[url] = null;
           reject(new Error(`${response.status} ${response.statusText}`));
+          return;
         }
         return response.text();
       })
@@ -151,6 +163,15 @@ function getMatchingCompanies(name) {
     company.Name.toLowerCase().startsWith(name.toLowerCase())
   );
 }
+
+app.get("/api/debug", async (req, res) => {
+  const companyShortName = req.query.company;
+  res.send(
+    await debugURLRequest(
+      `https://violationtracker.goodjobsfirst.org/prog.php?parent=${companyShortName}&detail=csv_results`
+    )
+  );
+});
 
 app.get("/api/company_info", (req, res) => {
   const name = req.query.company;
